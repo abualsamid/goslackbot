@@ -1,5 +1,7 @@
 package goslackbot
 
+import "time"
+
 // SlackUser defines the go struct equivalent of the Slack RTM user:
 // https://api.slack.com/types/user
 type SlackUser struct {
@@ -47,7 +49,7 @@ type SlackRTMResponse struct {
 	IMs      []SlackChannel       `json:"channels"`
 	MPIMs    []SlackChannel       `jsonL:"mpims"`
 	Groups   []SlackChannel       `json:"groups"`
-	Team     []SlackTeam          `json:"team"`
+	Team     SlackTeam            `json:"team"`
 }
 
 type SlackRTMResponseSelf struct {
@@ -81,3 +83,25 @@ type SlackTeam struct {
 	EmailDomain string `json:"email_domain"`
 	Domain      string `json:"domain"`
 }
+
+type SlackAPIReactionAdd struct {
+	Token     string `json:"token"`
+	Name      string `json:"name"`
+	Channel   string `json:"channel"`
+	TimeStamp string `json:"timestamp"`
+}
+
+type SlackPostMessageResponse struct {
+	Ok        bool   `json:"ok"`
+	Channel   string `json:"channel"`
+	TimeStamp string `json:"ts"`
+}
+
+type SlackConversation struct {
+	Messages []SlackMessage
+	Ongoing  bool
+	State    string
+	Started  time.Time
+}
+
+type ConversationMap map[string]SlackConversation

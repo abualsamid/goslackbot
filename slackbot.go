@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -14,6 +15,11 @@ import (
 	"github.com/kr/pretty"
 	"golang.org/x/net/websocket"
 )
+
+// debugg
+var out = ioutil.Discard
+var logMode = "screen"
+var logger *log.Logger
 
 type SlackBot struct {
 	ID                string
@@ -24,7 +30,7 @@ type SlackBot struct {
 	groups            map[string]SlackChannel
 	ims               map[string]SlackChannel // direct messages or im in slack lingo
 	mpims             map[string]SlackChannel
-	teams             map[string]SlackTeam
+	team              SlackTeam
 	ws                *websocket.Conn
 	OutgoingMessages  chan SlackMessage
 	IncomingMessages  map[string]chan SlackMessage
@@ -35,29 +41,21 @@ type SlackBot struct {
 
 // type SlackReactionCallback func(channel, timestamp string)
 
-type SlackAPIReactionAdd struct {
-	Token     string `json:"token"`
-	Name      string `json:"name"`
-	Channel   string `json:"channel"`
-	TimeStamp string `json:"timestamp"`
+func init() {
+	switch logMode {
+	case "file":
+		var err error
+		out, err = os.Create("goslackbot.log")
+		if nil != err {
+			out = os.Stdout
+		}
+	case "screen":
+		out = os.Stdout
+	default:
+		out = ioutil.Discard
+	}
+	logger = log.New(out, "[GoSlackBot]", log.Lshortfile)
 }
-
-type SlackPostMessageResponse struct {
-	Ok        bool   `json:"ok"`
-	Channel   string `json:"channel"`
-	TimeStamp string `json:"ts"`
-}
-
-type SlackConversation struct {
-	Messages []SlackMessage
-	Ongoing  bool
-	State    string
-	Started  time.Time
-}
-
-type ConversationMap map[string]SlackConversation
-
-var counter uint64
 
 func NewSlackBot(token string) (*SlackBot, error) {
 
@@ -88,7 +86,7 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		return nil, err
 	}
 
-	pretty.Printf("The Response Object is %#v \n", respObj)
+	logger.Printf("The Response Object is %#v \n", pretty.Formatter(respObj))
 
 	bot := SlackBot{}
 	bot.SetURL(respObj.Url)
@@ -99,12 +97,8 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		bot.channels[i.Name] = i
 		fmt.Printf("Channel: %s %s\n", i.ID, i.Name)
 	}
+	bot.team = respObj.Team
 
-	bot.teams = make(map[string]SlackTeam)
-	for _, i := range respObj.Teams {
-		bot.teams[i.Name] = i
-		log.Printf("Team: %d %s\n", i.ID, i.Name)
-	}
 	bot.users = make(map[string]SlackUser)
 	pretty.Printf("The response users are %#v \n", respObj.Users)
 	for _, u := range respObj.Users {
@@ -168,7 +162,7 @@ func (s *SlackBot) ReConnect() *websocket.Conn {
 		}
 
 		if !respObj.Ok {
-			log.Printf("Slack error: %s", respObj.Error)
+			logger.Printf("Sack Error: %s.", respObj.Error)
 			time.Sleep(time.Minute * 1)
 			continue
 		}
@@ -178,18 +172,15 @@ func (s *SlackBot) ReConnect() *websocket.Conn {
 
 		s.channels = make(map[string]SlackChannel)
 		for _, i := range respObj.Channels {
-			s.channels[i.Name] = i
+			s.channels[i.ID] = i
 			fmt.Printf("Channel: %s %s\n", i.ID, i.Name)
 		}
 
-		s.teams = make(map[string]SlackTeam)
-		for _, i := range respObj.Teams {
-			s.teams[i.Name] = i
-			log.Printf("Team: %d %s\n", i.ID, i.Name)
-		}
+		s.team = respObj.Team
+
 		s.users = make(map[string]SlackUser)
 		for _, u := range respObj.Users {
-			s.users[u.Name] = u
+			s.users[u.ID] = u
 			// fmt.Printf("User: %s\t%s\n", u.ID, u.Name)
 		}
 
