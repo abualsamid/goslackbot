@@ -18,7 +18,6 @@ import (
 
 // debugg
 var out = ioutil.Discard
-var logMode = "screen"
 var logger *log.Logger
 
 type SlackBot struct {
@@ -27,9 +26,9 @@ type SlackBot struct {
 	wsURL             string
 	users             map[string]SlackUser
 	channels          map[string]SlackChannel
-	groups            map[string]SlackChannel
-	ims               map[string]SlackChannel // direct messages or im in slack lingo
-	mpims             map[string]SlackChannel
+	groups            map[string]SlackPrivateChannel
+	ims               map[string]SlackIM // direct messages or im in slack lingo
+	mpims             map[string]SlackMPIM
 	team              SlackTeam
 	ws                *websocket.Conn
 	OutgoingMessages  chan SlackMessage
@@ -39,26 +38,34 @@ type SlackBot struct {
 	ReactionCallbacks map[string]func(SlackMessage)
 }
 
+var MessageCounters = make(map[string]*uint64)
+
 // type SlackReactionCallback func(channel, timestamp string)
 
-func init() {
+func initLogger(logMode string) {
+	var err error
 	switch logMode {
-	case "file":
-		var err error
-		out, err = os.Create("goslackbot.log")
-		if nil != err {
-			out = os.Stdout
-		}
+
 	case "screen":
 		out = os.Stdout
+	case "":
+		out = ioutil.Discard
 	default:
 		out = ioutil.Discard
+		if strings.HasPrefix(logMode, ".log") {
+			out, err = os.Create("goslackbot.log")
+			if nil != err {
+				out = os.Stdout
+			}
+		}
 	}
 	logger = log.New(out, "[GoSlackBot]", log.Lshortfile)
 }
 
 // NewSlackBot create a new slackbot instance.
-func NewSlackBot(token string) (*SlackBot, error) {
+// token is the slack rtm token for this specific bot
+// logMode can be "screen", fileName.log to log to, or "" to discard log
+func NewSlackBot(token string, logMode string) (*SlackBot, error) {
 
 	url := fmt.Sprintf("https://slack.com/api/rtm.start?mpim_aware=1&token=%s", token)
 	resp, err := http.Get(url)
@@ -76,8 +83,7 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		return nil, err
 	}
 
-	logger.Printf("The response pre marshalling  is: %+v\n", pretty.Formatter(body))
-
+	initLogger(logMode)
 	var respObj SlackRTMResponse
 	err = json.Unmarshal(body, &respObj)
 	if err != nil {
@@ -89,7 +95,7 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		return nil, err
 	}
 
-	logger.Printf("The Response Object is %#v \n", pretty.Formatter(respObj))
+	logger.Printf("The Response Object is %# v \n", pretty.Formatter(respObj))
 
 	bot := SlackBot{}
 
@@ -107,36 +113,33 @@ func NewSlackBot(token string) (*SlackBot, error) {
 func (s *SlackBot) populateResponse(respObj SlackRTMResponse) {
 
 	s.SetURL(respObj.Url)
-	s.setID((respObj.Self.Id))
+	s.setID(respObj.Self.Id)
 
 	s.channels = make(map[string]SlackChannel)
 	for _, c := range respObj.Channels {
 		s.channels[c.ID] = c
-		logger.Printf("Channel: %s %s \n", c.ID, c.Name)
 	}
 
 	s.team = respObj.Team
 
-	logger.Printf("The Response users are %+v", pretty.Formatter(respObj.Users))
 	s.users = make(map[string]SlackUser)
 	for _, u := range respObj.Users {
 		s.users[u.ID] = u
-		logger.Printf("User: %s %s \n", u.ID, u.Name)
 	}
 
-	s.mpims = make(map[string]SlackChannel)
+	s.mpims = make(map[string]SlackMPIM)
 	for _, mpim := range respObj.MPIMs {
-		s.channels[mpim.Name] = mpim
+		s.mpims[mpim.Name] = mpim
 		// fmt.Printf("MPIM: %s\t%s\n", mpim.ID, mpim.Name)
 	}
 
-	s.groups = make(map[string]SlackChannel)
+	s.groups = make(map[string]SlackPrivateChannel)
 	for _, group := range respObj.Groups {
 		s.groups[group.ID] = group
 		// fmt.Printf("Group: %s\t%s\n", group.ID, group.Name)
 	}
 
-	s.ims = make(map[string]SlackChannel)
+	s.ims = make(map[string]SlackIM)
 	for _, im := range respObj.IMs {
 		s.ims[im.ID] = im
 	}
@@ -227,7 +230,7 @@ func (s *SlackBot) GetUser(id string) SlackUser {
 	return s.users[id]
 }
 
-func (s *SlackBot) GetChannel(id string) SlackChannel {
+func (s *SlackBot) GetChannel(id string) interface{} {
 
 	if strings.HasPrefix(id, "G") {
 		return s.groups[id]
@@ -239,7 +242,7 @@ func (s *SlackBot) GetChannel(id string) SlackChannel {
 	}
 }
 
-func (s *SlackBot) GetChannelByName(name string) SlackChannel {
+func (s *SlackBot) GetChannelByName(name string) interface{} {
 	if strings.HasPrefix(name, "G") {
 		return s.groups[name]
 	} else {
@@ -416,9 +419,10 @@ func (s *SlackBot) Connect() error {
 	go func() {
 		for {
 			m := <-s.OutgoingMessages
-			channel := s.GetChannel(m.Channel)
+
 			if m.Channel != "" {
-				m.Id = atomic.AddUint64(&channel.LastMessageID, 1)
+				m.Id = atomic.AddUint64((MessageCounters[m.Channel]), 1)
+
 			}
 			//
 			// if m.Type == "ping" {

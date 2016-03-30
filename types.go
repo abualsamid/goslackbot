@@ -27,29 +27,52 @@ type SlackUserProfile struct {
 }
 
 type SlackChannel struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	IsArchived    bool     `json:"is_archived"`
-	LastMessageID uint64   `json:"-"`
-	IsMember      bool     `json:"is_member"`  // am i a member of this channel?
-	IsGeneral     bool     `json:"is_general"` // The #general channel?
-	Members       []string `json:"members"`
-	IsPrivate     bool     `json:"is_group"` // private channel?
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	IsArchived bool         `json:"is_archived"`
+	IsMember   bool         `json:"is_member"`  // am i a member of this channel?
+	IsGeneral  bool         `json:"is_general"` // The #general channel?
+	Members    []string     `json:"members"`
+	Latest     SlackMessage `json:"latest"`
+}
+
+type SlackPrivateChannel struct {
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	IsArchived bool         `json:"is_archived"`
+	IsMember   bool         `json:"is_member"`  // am i a member of this channel?
+	IsGeneral  bool         `json:"is_general"` // The #general channel?
+	Members    []string     `json:"members"`
+	IsPrivate  bool         `json:"is_group"` // private channel?
+	IsMPIM     bool         `json:"is_mpim"`
+	Latest     SlackMessage `json:"latest"`
+}
+
+type SlackMPIM struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Members []string `json:"members"`
+	Creator string   `json:"creator"`
+}
+
+type SlackIM struct {
+	ID   string `json:"id"`
+	User string `json:"user"`
 }
 
 // SlackRTMResponse the response we receive back from slack rtm.start
 // as defined here: https://api.slack.com/methods/rtm.start
 type SlackRTMResponse struct {
-	Ok       bool                 `json:"ok"`
-	Error    string               `json:"error"`
-	Url      string               `json:"url"`
-	Self     SlackRTMResponseSelf `json:"self"`
-	Users    []SlackUser          `json:"users"`
-	Channels []SlackChannel       `json:"channels"`
-	IMs      []SlackChannel       `json:"channels"`
-	MPIMs    []SlackChannel       `jsonL:"mpims"`
-	Groups   []SlackChannel       `json:"groups"`
-	Team     SlackTeam            `json:"team"`
+	Ok       bool                  `json:"ok"`
+	Error    string                `json:"error"`
+	Url      string                `json:"url"`
+	Self     SlackRTMResponseSelf  `json:"self"`
+	Users    []SlackUser           `json:"users"`
+	Channels []SlackChannel        `json:"channels"`
+	IMs      []SlackIM             `json:"ims"`
+	MPIMs    []SlackMPIM           `jsonL:"mpims"`
+	Groups   []SlackPrivateChannel `json:"groups"`
+	Team     SlackTeam             `json:"team"`
 }
 
 type SlackRTMResponseSelf struct {
