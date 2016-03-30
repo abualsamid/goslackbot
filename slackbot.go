@@ -89,39 +89,8 @@ func NewSlackBot(token string) (*SlackBot, error) {
 	logger.Printf("The Response Object is %#v \n", pretty.Formatter(respObj))
 
 	bot := SlackBot{}
-	bot.SetURL(respObj.Url)
-	bot.setID((respObj.Self.Id))
 
-	bot.channels = make(map[string]SlackChannel)
-	for _, i := range respObj.Channels {
-		bot.channels[i.Name] = i
-		fmt.Printf("Channel: %s %s\n", i.ID, i.Name)
-	}
-	bot.team = respObj.Team
-
-	bot.users = make(map[string]SlackUser)
-	pretty.Printf("The response users are %#v \n", respObj.Users)
-	for _, u := range respObj.Users {
-		bot.users[u.Name] = u
-		fmt.Printf("User: %s\t%s\n", u.ID, u.Name)
-	}
-
-	bot.mpims = make(map[string]SlackChannel)
-	for _, mpim := range respObj.MPIMs {
-		bot.channels[mpim.Name] = mpim
-		// fmt.Printf("MPIM: %s\t%s\n", mpim.ID, mpim.Name)
-	}
-
-	bot.groups = make(map[string]SlackChannel)
-	for _, group := range respObj.Groups {
-		bot.channels[group.ID] = group
-		// fmt.Printf("Group: %s\t%s\n", group.ID, group.Name)
-	}
-
-	bot.ims = make(map[string]SlackChannel)
-	for _, im := range respObj.IMs {
-		bot.ims[im.ID] = im
-	}
+	bot.populateResponse(respObj)
 
 	bot.OutgoingMessages = make(chan SlackMessage)
 	bot.IncomingMessages = make(map[string]chan SlackMessage, 0)
@@ -130,6 +99,44 @@ func NewSlackBot(token string) (*SlackBot, error) {
 
 	bot.ReactionCallbacks = make(map[string]func(SlackMessage))
 	return &bot, nil
+}
+
+func (s *SlackBot) populateResponse(respObj SlackRTMResponse) {
+
+	s.SetURL(respObj.Url)
+	s.setID((respObj.Self.Id))
+
+	s.channels = make(map[string]SlackChannel)
+	for _, c := range respObj.Channels {
+		s.channels[c.ID] = c
+		logger.Printf("Channel: %s %s \n", c.ID, c.Name)
+	}
+
+	s.team = respObj.Team
+
+	logger.Printf("The Response users are %+v", pretty.Formatter(respObj.Users))
+	s.users = make(map[string]SlackUser)
+	for _, u := range respObj.Users {
+		s.users[u.ID] = u
+		logger.Printf("User: %s %s \n", u.ID, u.Name)
+	}
+
+	s.mpims = make(map[string]SlackChannel)
+	for _, mpim := range respObj.MPIMs {
+		s.channels[mpim.Name] = mpim
+		// fmt.Printf("MPIM: %s\t%s\n", mpim.ID, mpim.Name)
+	}
+
+	s.groups = make(map[string]SlackChannel)
+	for _, group := range respObj.Groups {
+		s.groups[group.ID] = group
+		// fmt.Printf("Group: %s\t%s\n", group.ID, group.Name)
+	}
+
+	s.ims = make(map[string]SlackChannel)
+	for _, im := range respObj.IMs {
+		s.ims[im.ID] = im
+	}
 }
 
 func (s *SlackBot) ReConnect() *websocket.Conn {
@@ -167,39 +174,8 @@ func (s *SlackBot) ReConnect() *websocket.Conn {
 			continue
 		}
 
-		s.SetURL(respObj.Url)
-		s.setID((respObj.Self.Id))
+		s.populateResponse(respObj)
 
-		s.channels = make(map[string]SlackChannel)
-		for _, i := range respObj.Channels {
-			s.channels[i.ID] = i
-			fmt.Printf("Channel: %s %s\n", i.ID, i.Name)
-		}
-
-		s.team = respObj.Team
-
-		s.users = make(map[string]SlackUser)
-		for _, u := range respObj.Users {
-			s.users[u.ID] = u
-			// fmt.Printf("User: %s\t%s\n", u.ID, u.Name)
-		}
-
-		s.mpims = make(map[string]SlackChannel)
-		for _, mpim := range respObj.MPIMs {
-			s.channels[mpim.Name] = mpim
-			// fmt.Printf("MPIM: %s\t%s\n", mpim.ID, mpim.Name)
-		}
-
-		s.groups = make(map[string]SlackChannel)
-		for _, group := range respObj.Groups {
-			s.channels[group.ID] = group
-			// fmt.Printf("Group: %s\t%s\n", group.ID, group.Name)
-		}
-
-		s.ims = make(map[string]SlackChannel)
-		for _, im := range respObj.IMs {
-			s.ims[im.ID] = im
-		}
 		ws, err := websocket.Dial(s.wsURL, "", "https://api.slack.com/")
 		if err == nil {
 			s.ws = ws
