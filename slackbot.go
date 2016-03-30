@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kr/pretty"
 	"golang.org/x/net/websocket"
 )
 
@@ -87,9 +88,11 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		return nil, err
 	}
 
+	pretty.Printf("The Response Object is %#v \n", respObj)
+
 	bot := SlackBot{}
 	bot.SetURL(respObj.Url)
-	bot.SetID((respObj.Self.Id))
+	bot.setID((respObj.Self.Id))
 
 	bot.channels = make(map[string]SlackChannel)
 	for _, i := range respObj.Channels {
@@ -100,12 +103,13 @@ func NewSlackBot(token string) (*SlackBot, error) {
 	bot.teams = make(map[string]SlackTeam)
 	for _, i := range respObj.Teams {
 		bot.teams[i.Name] = i
-		log.Printf("Team: %s %s\n", i.ID, i.Name)
+		log.Printf("Team: %d %s\n", i.ID, i.Name)
 	}
 	bot.users = make(map[string]SlackUser)
+	pretty.Printf("The response users are %#v \n", respObj.Users)
 	for _, u := range respObj.Users {
 		bot.users[u.Name] = u
-		// fmt.Printf("User: %s\t%s\n", u.ID, u.Name)
+		fmt.Printf("User: %s\t%s\n", u.ID, u.Name)
 	}
 
 	bot.mpims = make(map[string]SlackChannel)
@@ -170,7 +174,7 @@ func (s *SlackBot) ReConnect() *websocket.Conn {
 		}
 
 		s.SetURL(respObj.Url)
-		s.SetID((respObj.Self.Id))
+		s.setID((respObj.Self.Id))
 
 		s.channels = make(map[string]SlackChannel)
 		for _, i := range respObj.Channels {
@@ -181,7 +185,7 @@ func (s *SlackBot) ReConnect() *websocket.Conn {
 		s.teams = make(map[string]SlackTeam)
 		for _, i := range respObj.Teams {
 			s.teams[i.Name] = i
-			log.Printf("Team: %s %s\n", i.ID, i.Name)
+			log.Printf("Team: %d %s\n", i.ID, i.Name)
 		}
 		s.users = make(map[string]SlackUser)
 		for _, u := range respObj.Users {
@@ -247,6 +251,7 @@ func (s *SlackBot) FetchReactionCallback(channel, timestamp string) func(m Slack
 	}
 }
 
+// GetUser retrieves a user by ID from the original list of users established upon connection.
 func (s *SlackBot) GetUser(id string) SlackUser {
 
 	return s.users[id]
@@ -368,6 +373,7 @@ func (s *SlackBot) PostMessage(channel, text string) (*SlackPostMessageResponse,
 	return &response, nil
 }
 
+// AddReaction adds a reaction to be sent back to slack.
 func (s *SlackBot) AddReaction(channel, timestamp, reaction string) error {
 
 	v := url.Values{}
@@ -418,9 +424,8 @@ func (s *SlackBot) Ping() error {
 	return nil
 }
 
-func (s *SlackBot) SetID(id string) error {
+func (s *SlackBot) setID(id string) error {
 	s.ID = id
-
 	return nil
 }
 
@@ -445,7 +450,7 @@ func (s *SlackBot) Connect() error {
 			if m.Channel != "" {
 				m.Id = atomic.AddUint64(&channel.LastMessageID, 1)
 			}
-
+			//
 			// if m.Type == "ping" {
 			// 	log.Printf("pinging... %s \n", time.Now().String())
 			// }
@@ -454,6 +459,9 @@ func (s *SlackBot) Connect() error {
 			for {
 				if err := websocket.JSON.Send(s.ws, m); err != nil {
 					log.Printf("Error %v sending message %#v on websocket\n", err, m)
+					if strings.HasSuffix(err.Error(), "broken pipe") {
+						ws = s.ReConnect()
+					}
 					if m.Type == "ping" {
 						// throw away the ping if we are having network issues. wait on the socket to be reconstructed elsewhere.
 						retry = 1

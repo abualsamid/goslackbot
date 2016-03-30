@@ -1,13 +1,17 @@
 package goslackbot
 
+// SlackUser defines the go struct equivalent of the Slack RTM user:
+// https://api.slack.com/types/user
 type SlackUser struct {
-	ID           string           `json:"id"`
-	Name         string           `json:"name"`
-	Profile      SlackUserProfile `json:"profile"`
-	IsAdmin      bool             `json:"is_admin"`
-	IsOwner      bool             `json:"is_owner"`
-	IsRestricted bool             `json:"is_restricted"`
-	Has2FA       bool             `json:"has_2fa"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Deleted        bool             `json:"deleted"`
+	Profile        SlackUserProfile `json:"profile"`
+	IsAdmin        bool             `json:"is_admin"`
+	IsOwner        bool             `json:"is_owner"`
+	IsPrimaryOwner bool             `json:"is_primary_owner"`
+	IsRestricted   bool             `json:"is_restricted"`
+	Has2FA         bool             `json:"has_2fa"`
 }
 
 type SlackUserProfile struct {
@@ -17,15 +21,22 @@ type SlackUserProfile struct {
 	Email     string `json:"email"`
 	Skype     string `json:"skype"`
 	Phone     string `json:"phone"`
+	Image24   string `json:"image_24"`
 }
 
 type SlackChannel struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	IsArchived    bool   `json:"is_archived"`
-	LastMessageID uint64 `json:"-"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	IsArchived    bool     `json:"is_archived"`
+	LastMessageID uint64   `json:"-"`
+	IsMember      bool     `json:"is_member"`  // am i a member of this channel?
+	IsGeneral     bool     `json:"is_general"` // The #general channel?
+	Members       []string `json:"members"`
+	IsPrivate     bool     `json:"is_group"` // private channel?
 }
 
+// SlackRTMResponse the response we receive back from slack rtm.start
+// as defined here: https://api.slack.com/methods/rtm.start
 type SlackRTMResponse struct {
 	Ok       bool                 `json:"ok"`
 	Error    string               `json:"error"`
@@ -36,7 +47,7 @@ type SlackRTMResponse struct {
 	IMs      []SlackChannel       `json:"channels"`
 	MPIMs    []SlackChannel       `jsonL:"mpims"`
 	Groups   []SlackChannel       `json:"groups"`
-	Teams    []SlackTeam          `json:"teams"`
+	Team     []SlackTeam          `json:"team"`
 }
 
 type SlackRTMResponseSelf struct {
