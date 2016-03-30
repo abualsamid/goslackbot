@@ -57,6 +57,7 @@ func init() {
 	logger = log.New(out, "[GoSlackBot]", log.Lshortfile)
 }
 
+// NewSlackBot create a new slackbot instance.
 func NewSlackBot(token string) (*SlackBot, error) {
 
 	url := fmt.Sprintf("https://slack.com/api/rtm.start?mpim_aware=1&token=%s", token)
@@ -74,6 +75,8 @@ func NewSlackBot(token string) (*SlackBot, error) {
 		log.Printf("Error Creating Bot: %s \n", err)
 		return nil, err
 	}
+
+	logger.Printf("The response pre marshalling  is: %+v\n", pretty.Formatter(body))
 
 	var respObj SlackRTMResponse
 	err = json.Unmarshal(body, &respObj)

@@ -78,7 +78,7 @@ type SlackMessageItem struct {
 }
 
 type SlackTeam struct {
-	ID          uint64 `json:"id"`
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	EmailDomain string `json:"email_domain"`
 	Domain      string `json:"domain"`
