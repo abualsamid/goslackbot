@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/kr/pretty"
@@ -38,7 +37,7 @@ type SlackBot struct {
 	ReactionCallbacks map[string]func(SlackMessage)
 }
 
-var MessageCounters = make(map[string]*uint64)
+var MessageCounters = make(map[string]uint64)
 
 // type SlackReactionCallback func(channel, timestamp string)
 
@@ -421,8 +420,9 @@ func (s *SlackBot) Connect() error {
 			m := <-s.OutgoingMessages
 
 			if m.Channel != "" {
-				m.Id = atomic.AddUint64((MessageCounters[m.Channel]), 1)
+				MessageCounters[m.Channel] = 1 + MessageCounters[m.Channel]
 
+				m.Id = MessageCounters[m.Channel]
 			}
 			//
 			// if m.Type == "ping" {
